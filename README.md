@@ -62,9 +62,3 @@ URLのうしろにつけると使えます。
 
 - `?dbg=1`：ブラウザのコンソールから `window.__ro` で中身を見られます
 - `?mplog=1`：オンライン対戦の通信ログを、画面の上に表示します
-
-## 公開のしかた（GitHub Pages）
-
-1. リポジトリ `battleship` のいちばん上に `index.html` と `README.md` をおきます。
-2. リポジトリの **Settings → Pages** で、Source を「Deploy from a branch」、ブランチを `main`、フォルダを `/ (root)` にして保存します（はじめの1回だけ）。
-3. コミットしてプッシュすると、少しして https://anit0328.github.io/battleship/ に反映されます。
