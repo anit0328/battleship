@@ -139,8 +139,9 @@ h2{margin:0;font:400 22px var(--display);letter-spacing:.04em;text-wrap:balance}
 .top .title{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;font-size:clamp(16px,4.8vw,22px)}
 .scope{flex:1 1 auto;min-height:200px;background:none;border:0;padding:0;cursor:pointer;border-radius:14px}
 .warn{color:var(--rose);font-weight:800}
-.homebtns{display:flex;justify-content:center;flex:none}
-#bFight{font-size:17px;padding:10px 20px;width:min(84%,320px)}
+.homebtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:none;align-self:center;width:min(100%,380px)}
+#bFight,#bPwFight{font-size:17px;padding:10px 8px;white-space:nowrap}
+#bPwFight{background:#FFA53D;color:#1D1A33;box-shadow:0 4px 0 #C2741A}#bPwFight:active{box-shadow:0 1px 0 #C2741A}
 #vHome .chips,#vDeck .tray,#vDeck .dbtns{flex:none}
 /* deck editor */
 .dboard{width:100%;aspect-ratio:1;max-height:min(46dvh,420px);flex:none}
@@ -207,7 +208,7 @@ h2{margin:0;font:400 22px var(--display);letter-spacing:.04em;text-wrap:balance}
   <main>
     <section class="view" id="vHome">
       <button type="button" class="cwrap scope" id="bScope" aria-label="デッキ編成をひらく"><canvas id="hCv"></canvas></button>
-      <div class="homebtns"><button class="btn" id="bFight">出撃<small>相手をさがす</small></button></div>
+      <div class="homebtns"><button class="btn" id="bFight">出撃<small>相手をさがす</small></button><button class="btn" id="bPwFight">あいことば出撃<small>ともだちと対戦</small></button></div>
       <div class="chips" id="rec"></div>
     </section>
     <section class="view" id="vDeck" hidden>
@@ -221,6 +222,7 @@ h2{margin:0;font:400 22px var(--display);letter-spacing:.04em;text-wrap:balance}
     <button data-v="vDeck"><canvas width="56" height="56" data-ic="deck"></canvas>デッキ</button>
   </nav>
   <div class="ov" id="ovName" hidden><form class="sheet" id="fName"><h3>プレイヤー名</h3><p class="sub" id="nameSub">対戦で相手に見える名前。</p><input type="text" id="iName" maxlength="10" placeholder="なまえ（10文字まで）" autocomplete="off"><button class="btn" type="submit">けってい</button></form></div>
+  <div class="ov" id="ovPw" hidden><form class="sheet" id="fPw"><div class="opthd"><h3>あいことば出撃</h3><button type="button" class="xbtn" id="bPwX" aria-label="とじる">✕</button></div><p class="sub">ともだちと同じあいことばを入れて、2人とも出撃すると対戦できる。90秒まっても来なければ、やめになる。</p><input type="text" id="iPw" maxlength="12" placeholder="あいことば（12文字まで）" autocomplete="off"><button class="btn" type="submit">このあいことばで出撃</button></form></div>
   <div class="ov" id="ovHelp" hidden><div class="sheet" id="helpSheet"></div></div>
   <div class="ov" id="ovMatch" hidden><div class="match" id="matchBox"></div></div>
   <div class="ov" id="ovBattle" hidden><div class="bt" id="bt"></div></div>
@@ -261,11 +263,11 @@ function randomDeck(r=Math.random){for(let tr=0;tr<300;tr++){const d=PT.map(()=>
   for(const t of [5,4,6,3,2,1,0]){let put=false;for(let k=0;k<300&&!put;k++){const len=PT[t].len,v=len>1&&r()<.5?1:0,p={x:Math.floor(r()*(v?N:N-len+1)),y:Math.floor(r()*(v?N-len+1:N)),v,d:len>1?(v?(r()<.5?1:3):(r()<.5?0:2)):Math.floor(r()*4)};if(fits(d,t,p,-1)){d[t]=p;put=true}}if(!put){ok=false;break}}
   if(ok)return d}return PT.map(()=>null)}
 /* one side of a battle: deck (null if hidden), damage per piece, what the attacker has learned (marks: 0 ?, 1 miss, 2 hit) */
-function mkSide(deck){return{deck,occ:deck?occOf(deck):null,dmg:PT.map(()=>0),sunk:PT.map(()=>false),hitG:new Uint8Array(N*N),marks:new Uint8Array(N*N),sunkList:[]}}
+function mkSide(deck){return{deck,occ:deck?occOf(deck):null,dmg:PT.map(()=>0),sunk:PT.map(()=>false),hitG:new Uint8Array(N*N),marks:new Uint8Array(N*N),hc:new Uint8Array(N*N),sunkList:[]}}
 function rayCells(x,y){const o=[{x,y,d:0}];for(let i=0;i<N;i++){if(i!==x)o.push({x:i,y,d:Math.abs(i-x)});if(i!==y)o.push({x,y:i,d:Math.abs(i-y)})}return o}
 /* durability is per cell: a cell of a piece with durability n breaks after n hits. All cells broken → sunk.
    hits = [x,y,broken(0/1)] */
-function resolveShot(side,x,y){const hits=[],sunk=[];for(const c of rayCells(x,y)){const i=c.y*N+c.x,p=side.occ[i];if(p>=0&&side.hitG[i]<PT[p].hp){const k=Math.min(c.d===0?2:1,PT[p].hp-side.hitG[i]);side.hitG[i]+=k;side.dmg[p]+=k;hits.push([c.x,c.y,side.hitG[i]>=PT[p].hp?1:0])}}
+function resolveShot(side,x,y){const hits=[],sunk=[];for(const c of rayCells(x,y)){const i=c.y*N+c.x,p=side.occ[i];if(p>=0&&side.hitG[i]<PT[p].hp){const k=Math.min(c.d===0?2:1,PT[p].hp-side.hitG[i]);side.hitG[i]+=k;side.dmg[p]+=k;hits.push([c.x,c.y,side.hitG[i]>=PT[p].hp?1:0,k])}}
   PT.forEach((pt,t)=>{if(side.sunk[t])return;const p=side.deck[t];if(cellsOf(p,t).every(([a,b])=>side.hitG[b*N+a]>=pt.hp)){side.sunk[t]=true;sunk.push({t,x:p.x,y:p.y,v:p.v?1:0})}});return{hits,sunk}}
 function knowOf(side){const k=Uint8Array.from(side.marks);for(const s of side.sunkList)for(const [x,y] of cellsOf(s,s.t))if(inB(x,y))k[y*N+x]=3;return k}
 function newCells(side,x,y){const k=knowOf(side);return rayCells(x,y).filter(c=>k[c.y*N+c.x]===0).length}
@@ -364,8 +366,11 @@ function drawBoard(cv,B,now){if(!fitCv(cv))return;const S=cv._S,c=cv.getContext(
     for(let i=0;i<N*N;i++){const m=side.marks[i];if(!m)continue;const x=ox+(i%N)*cs,y=oy+Math.floor(i/N)*cs;
       if(m===1){c.fillStyle=en?'#2F5C68':'#3B6475';c.beginPath();c.arc(x+cs/2,y+cs/2,Math.max(1.5,cs*.1),0,Math.PI*2);c.fill()}
       else if(m===4){c.fillStyle=en?'rgba(122,30,49,.95)':'rgba(122,30,49,.82)';rr(c,x+cs*.08,y+cs*.08,cs*.84,cs*.84,cs*.14);c.fill();c.strokeStyle='#FF8FA3';c.lineWidth=Math.max(1.5,cs*.07);c.beginPath();c.moveTo(x+cs*.3,y+cs*.3);c.lineTo(x+cs*.7,y+cs*.7);c.moveTo(x+cs*.7,y+cs*.3);c.lineTo(x+cs*.3,y+cs*.7);c.stroke()}
-      else{c.fillStyle=en?'rgba(255,92,122,.9)':'rgba(255,92,122,.72)';rr(c,x+cs*.08,y+cs*.08,cs*.84,cs*.84,cs*.14);c.fill();c.fillStyle='#FFF4F6';
-        if(cs>=20){c.font=`${Math.round(cs*.32)}px DotGothic16, monospace`;c.textAlign='center';c.textBaseline='middle';c.fillText('HIT',x+cs/2,y+cs/2+1)}
+      else{/* damaged cell: colour deepens with each hit, and the hit count is written in it */
+        const n=side.hc?Math.max(1,side.hc[i]):1,HC=['#FFA3B4','#FF6B86','#EE3A5E','#C81E47','#9E1438'],c1=HC[Math.min(n,5)-1],c0=HC[Math.max(0,Math.min(n,5)-2)];
+        const lg=c.createLinearGradient(x,y,x,y+cs);lg.addColorStop(0,n>1?c0:'#FFC6D1');lg.addColorStop(1,c1);c.globalAlpha=en?.95:.85;c.fillStyle=lg;rr(c,x+cs*.08,y+cs*.08,cs*.84,cs*.84,cs*.14);c.fill();c.globalAlpha=1;c.fillStyle=n>1?'#FFF4F6':'#5A1022';c.textAlign='center';c.textBaseline='middle';
+        if(cs>=26){c.font=`${Math.round(cs*.22)}px DotGothic16, monospace`;c.fillText('HIT',x+cs/2,y+cs*.32);c.font=`${Math.round(cs*.4)}px DotGothic16, monospace`;c.fillText(String(n),x+cs/2,y+cs*.66)}
+        else if(cs>=13){c.font=`${Math.round(cs*.56)}px DotGothic16, monospace`;c.fillText(String(n),x+cs/2,y+cs/2+1)}
         else{c.strokeStyle='#FFF4F6';c.lineWidth=1.5;c.beginPath();c.moveTo(x+cs*.3,y+cs*.3);c.lineTo(x+cs*.7,y+cs*.7);c.moveTo(x+cs*.7,y+cs*.3);c.lineTo(x+cs*.3,y+cs*.7);c.stroke()}}}}
   if(B.mode==='edit'){const g=ghostOf();if(g){const [x,y]=pc(g.p,g.t);for(const [a,b] of cellsOf(g.p,g.t))if(inB(a,b)){c.fillStyle=g.ok?'rgba(255,200,61,.22)':'rgba(255,92,122,.3)';c.fillRect(ox+a*cs+1,oy+b*cs+1,cs-2,cs-2)}drawPiece(c,g.t,x,y,cs,g.p.d,g.ok?'ghost':'bad')}}
   /* crosshair: a whole row + column band that glides between cells */
@@ -384,7 +389,7 @@ function drawBoard(cv,B,now){if(!fitCv(cv))return;const S=cv._S,c=cv.getContext(
     for(const [h,a] of [[cs*.62,.25],[cs*.3,.55],[cs*.1,1]]){c.fillStyle=`rgba(255,${a===1?255:236},${a===1?255:170},${a*fade})`;c.fillRect(Math.max(ox,x-reach),y-h/2,Math.min(ox+W,x+reach)-Math.max(ox,x-reach),h);c.fillRect(x-h/2,Math.max(oy,y-reach),h,Math.min(oy+W,y+reach)-Math.max(oy,y-reach))}}
   c.restore();
   /* impact: explosion at the cross centre */
-  if(B.boom){const bm=B.boom,e=(now-bm.t0)/750;if(e>=1)B.boom=null;else{const x=ox+(bm.x+.5)*cs,y=oy+(bm.y+.5)*cs,r=cs*(.4+1.5*Math.sqrt(e)),a=1-e;
+  if(B.boom){const bm=B.boom,e=Math.max(0,(now-bm.t0)/750);if(e>=1)B.boom=null;else{const x=ox+(bm.x+.5)*cs,y=oy+(bm.y+.5)*cs,r=cs*(.4+1.5*Math.sqrt(e)),a=1-e;
     const gr=c.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(255,255,230,${a})`);gr.addColorStop(.35,`rgba(255,200,61,${a*.9})`);gr.addColorStop(.7,`rgba(255,92,60,${a*.6})`);gr.addColorStop(1,'rgba(255,92,60,0)');c.fillStyle=gr;c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();
     c.strokeStyle=`rgba(255,244,200,${a})`;c.lineWidth=Math.max(1.5,cs*.1*(1-e));c.beginPath();c.arc(x,y,cs*(.5+2.2*e),0,Math.PI*2);c.stroke()}}
   if(B.parts.length){for(const p of B.parts){p.x+=p.vx;p.y+=p.vy;p.vx*=.93;p.vy*=.93;p.life--;c.fillStyle=p.col;c.globalAlpha=clamp(p.life/20,0,1);c.fillRect(p.x-2,p.y-2,4,4)}c.globalAlpha=1;B.parts=B.parts.filter(p=>p.life>0)}
@@ -530,11 +535,11 @@ const SLOTS=['rdr-slot-0','rdr-slot-1','rdr-slot-2','rdr-slot-3'];
 function mpSideMany(reqs){return new Promise(res=>{let ws,done=false,i=0;const out=[];const fin=()=>{if(done)return;done=true;clearTimeout(to);try{ws.close()}catch(e){}res(out)};const to=setTimeout(fin,7000);
   try{ws=new WebSocket(MP_URL)}catch(e){return fin()}ws.binaryType='arraybuffer';const next=()=>{if(i>=reqs.length)return fin();mpLog('[mp] side >',reqs[i]);ws.send(mpEnc(reqs[i]))};
   ws.onopen=next;ws.onerror=fin;ws.onclose=fin;ws.onmessage=ev=>{let m;try{m=mpDec(new Uint8Array(ev.data))}catch(e){return}if(m&&m.cast!=null)return;mpLog('[mp] side <',m);out[i++]=m;next()}})}
-async function findOnline(cm){const me=myUiid(),hello={ty:'hi',name:save.name,v:VER,cm};
+async function findOnline(cm,pw){const me=myUiid(),hello={ty:'hi',name:save.name,v:VER,cm},SL=pw?['rdr-pw-'+hex(cyrb128('pw:'+pw)).slice(0,16)]:SLOTS,WAIT=pw?90000:8000;NET.cancel=false;
   mpLog('[match] 接続中',MP_URL);try{await netConnect()}catch(e){mpLog('[match] 接続できない',String(e&&e.message));return null}
   NET.inbox=[];NET.left=false;NET.opIn=false;NET.uid=me;
-  const rs=await mpSideMany(SLOTS.map(u=>({action:'data_download',uiid:u,channel:0})));
-  const slots=SLOTS.map((u,k)=>{const o=rs[k]&&rs[k].res===0?jdec(rs[k].channel0):null;return{u,o:o&&o.r&&o.u!==me&&Math.abs(Date.now()-(o.t||0))<30000?o:null}});
+  const rs=await mpSideMany(SL.map(u=>({action:'data_download',uiid:u,channel:0})));
+  const slots=SL.map((u,k)=>{const o=rs[k]&&rs[k].res===0?jdec(rs[k].channel0):null;return{u,o:o&&o.r&&o.u!==me&&Math.abs(Date.now()-(o.t||0))<30000?o:null}});
   mpLog('[match] 待っている人',slots.filter(x=>x.o).map(x=>x.u+':'+x.o.r));
   for(const sl of slots.filter(x=>x.o).sort(()=>Math.random()-.5)){
     const r=await netReq({action:'enter',uiid:me,room_id:sl.o.r,name:save.name,channel0:_te.encode('{}')});mpLog('[match] 入室',r);
@@ -547,7 +552,7 @@ async function findOnline(cm){const me=myUiid(),hello={ty:'hi',name:save.name,v:
   const put=()=>netReq({action:'data_upload',uiid:slot,channel0:_te.encode(JSON.stringify({r:NET.room,t:Date.now(),u:me})),cast:0,buffering:0});
   mpLog('[match] 待ち合わせ情報を保存',await put());
   const t0=Date.now();let ref=Date.now();
-  while(!NET.opIn&&!NET.left&&Date.now()-t0<8000){await new Promise(r=>{NET.waiters.push(r);setTimeout(r,600)});if(Date.now()-ref>3000&&!NET.opIn){ref=Date.now();put()}}
+  while(!NET.opIn&&!NET.left&&!NET.cancel&&Date.now()-t0<WAIT){await new Promise(r=>{NET.waiters.push(r);setTimeout(r,600)});if(Date.now()-ref>3000&&!NET.opIn){ref=Date.now();put()}}
   if(!NET.opIn){mpLog('[match] 8秒だれも来なかった→CPU戦');netClose();return null}
   netRaw({action:'data_upload',uiid:slot,channel0:_te.encode('{}'),cast:0,buffering:0});
   const hi=await waitFor(m=>m.ty==='hi',8000);if(!hi||hi.ty!=='hi'||typeof hi.cm!=='string'){mpLog('[match] あいさつが来ない');netClose();return null}
@@ -560,11 +565,14 @@ function cpuPow(){return clamp(((save.plv||1)-1)/14,0,1)}
 function cpuEase(){return Math.min(3,save.lstreak||0)*.08}
 function cpuPick(g){const sc=aiScores(g.me).filter(s=>s.s>0),P=cpuPow();if(!sc.length)return{x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};
   if(Math.random()<.3*(1-P)+cpuEase())return sc[Math.floor(Math.random()*sc.length)];const k=Math.min(sc.length,1+Math.floor((1-P)*4+cpuEase()*10));return sc[Math.floor(Math.random()*k)]}
-async function startFight(){if(!deckOk(save.deck)){save.deck=fixDeck(save.deck);persist();renderHome()}SFX.tap();
-  const mb=$('#matchBox');mb.innerHTML=`<div class="radar"></div><b>レーダーで相手をさがしています…</b><span class="sub" style="color:var(--muted)">近くの司令官に接続中</span>`;$('#ovMatch').hidden=false;
+async function startFight(pw){if(!deckOk(save.deck)){save.deck=fixDeck(save.deck);persist();renderHome()}SFX.tap();
+  const mb=$('#matchBox');mb.innerHTML=pw?`<div class="radar"></div><b>あいことば「${esc(pw)}」で<br>相手を待っています…</b><span class="sub" style="color:var(--muted)">ともだちにも同じあいことばで出撃してもらおう</span><button type="button" class="btn ghost" id="bPwCancel">やめる</button>`
+    :`<div class="radar"></div><b>レーダーで相手をさがしています…</b><span class="sub" style="color:var(--muted)">近くの司令官に接続中</span>`;$('#ovMatch').hidden=false;
+  if(pw)$('#bPwCancel').onclick=()=>{NET.cancel=true;SFX.tap();$('#bPwCancel').disabled=true};
   const deck=normDeck(save.deck),salt=Math.random().toString(36).slice(2)+Date.now().toString(36),cm=hex(cyrb128(JSON.stringify(deck)+'|'+salt));
-  const t0=Date.now();let on=null;if(save.opt.online!==false)on=await findOnline(cm);mpLog('[battle] 結果:',on?'人とマッチ':'CPU戦');
-  const wait=1600+Math.random()*1800-(Date.now()-t0);if(wait>0)await sleep(wait);
+  const t0=Date.now();let on=null;if(pw||save.opt.online!==false)on=await findOnline(cm,pw);
+  if(pw&&!on){$('#ovMatch').hidden=true;if(!NET.cancel)toast('相手が見つからなかった');return}mpLog('[battle] 結果:',on?'人とマッチ':'CPU戦');
+  const wait=(pw?600:1600+Math.random()*1800)-(Date.now()-t0);if(wait>0)await sleep(wait);
   const net=!!on,opName=on?on.name:HANDLES[Math.floor(Math.random()*HANDLES.length)],my=on?on.seat:0,first=on?on.first:(Math.random()<.5?1:0);
   mb.innerHTML=`<b style="color:var(--gold)">マッチしました！</b><div class="vsrow"><div class="t"><b>${esc(save.name)}</b><small>${first===my?'先攻':'後攻'}</small></div><span class="vs">VS</span><div class="t"><b>${esc(opName)}</b><small>${first===my?'後攻':'先攻'}</small></div></div>`;SFX.up();
   await sleep(1700);$('#ovMatch').hidden=true;
@@ -574,7 +582,10 @@ async function startFight(){if(!deckOk(save.deck)){save.deck=fixDeck(save.deck);
   G.eB={mode:'enemy',side:G.en,cur:{x:4,y:4,ax:4,ay:4,on:false,col:'gold'},parts:[],shake:0};
   G.mB={mode:'own',side:G.me,cur:{x:4,y:4,ax:4,ay:4,on:false,col:'rose'},parts:[],shake:0};
   renderBT();$('#ovBattle').hidden=false;bgmStart();runGame(G)}
-$('#bFight').onclick=startFight;
+$('#bFight').onclick=()=>startFight();
+$('#bPwFight').onclick=()=>{SFX.tap();$('#iPw').value=save.pw||'';$('#ovPw').hidden=false;setTimeout(()=>$('#iPw').focus(),50)};
+$('#bPwX').onclick=()=>{$('#ovPw').hidden=true};
+$('#fPw').onsubmit=e=>{e.preventDefault();const v=$('#iPw').value.trim().slice(0,12);if(!v){$('#iPw').focus();return}save.pw=v;persist();$('#ovPw').hidden=true;startFight(v)};
 function renderBT(){const g=G,b=$('#bt');
   b.innerHTML=`<div class="bhd"><div class="who"><b>${esc(g.opName)}</b></div><div class="sk" aria-label="撃沈した数"><span>撃沈</span><span class="skp" id="skp"></span><b><em id="opSunk">0</em>/${WIN_SINK}</b></div></div>
     <div class="cwrap ebwrap"><canvas id="eCv" tabindex="0" aria-label="相手のエリア。タップでねらうマスをえらぶ"></canvas></div>
@@ -612,7 +623,7 @@ function aimWait(g,ms){return new Promise(res=>{let done=false,stop=()=>{};const
   stop=timerRun(ms,()=>{const b=aiScores(g.en)[0],cu=g.eB.cur;if(b){cu.x=b.x;cu.y=b.y;updAim()}toast('時間切れ！ おまかせで発射');setTimeout(()=>fin({x:cu.x,y:cu.y}),500)})})}
 const SMALL=()=>window.matchMedia('(pointer:coarse)').matches;
 function cleanRes(m,side,x,y){const on=new Set(rayCells(x,y).map(c=>c.y*N+c.x)),seen=new Set(),hits=[];
-  for(const h of Array.isArray(m.h)?m.h:[]){if(!Array.isArray(h))continue;const a=h[0]|0,b=h[1]|0,i=b*N+a;if(inB(a,b)&&on.has(i)&&!seen.has(i)&&side.marks[i]!==4&&side.marks[i]!==1){seen.add(i);hits.push([a,b,h[2]?1:0])}}
+  for(const h of Array.isArray(m.h)?m.h:[]){if(!Array.isArray(h))continue;const a=h[0]|0,b=h[1]|0,i=b*N+a;if(inB(a,b)&&on.has(i)&&!seen.has(i)&&side.marks[i]!==4&&side.marks[i]!==1){seen.add(i);hits.push([a,b,h[2]?1:0,clamp((h[3]|0)||1,1,2)])}}
   const sunk=[];for(const s of Array.isArray(m.s)?m.s:[]){if(!s)continue;const t=s.t|0;if(t<0||t>=PT.length||side.sunkList.some(q=>q.t===t)||sunk.some(q=>q.t===t))continue;const p={t,x:s.x|0,y:s.y|0,v:s.v?1:0};if(cellsOf(p,t).every(([a,b])=>inB(a,b)))sunk.push(p)}
   return{hits,sunk}}
 async function runGame(g){
@@ -641,8 +652,8 @@ async function theirTurn(g){setTurn(g,false);g.eB.cur.on=false;const B=g.mB;B.cu
   B.charge={x,y,t0:performance.now()};SFX.charge();await sleep(650);
   await shotAnim(g,B,g.me,x,y,res,false);return true}
 async function shotAnim(g,B,side,x,y,res,atk){B.charge=null;B.sweep={x,y,t0:performance.now(),sp:SW};SFX.beam();
-  const hs=new Map(res.hits.map(h=>[h[1]*N+h[0],h[2]?4:2])),byD=[];for(const c of rayCells(x,y))(byD[c.d]=byD[c.d]||[]).push(c);
-  for(let d=0;d<byD.length;d++){let boom=false;if(d===0){B.boom={x,y,t0:performance.now()};burst(B,x,y,['#FFC83D','#FF7A59','#FFF4C2']);burst(B,x,y,['#FFC83D','#FF7A59','#FFF4C2']);SFX.boom();B.shake=Math.max(B.shake||0,10)}for(const c of byD[d]||[]){const i=c.y*N+c.x;if(hs.has(i)){side.marks[i]=hs.get(i);boom=true;burst(B,c.x,c.y)}else if(side.marks[i]===0)side.marks[i]=1}
+  const hs=new Map(res.hits.map(h=>[h[1]*N+h[0],h])),byD=[];for(const c of rayCells(x,y))(byD[c.d]=byD[c.d]||[]).push(c);
+  for(let d=0;d<byD.length;d++){let boom=false;if(d===0){B.boom={x,y,t0:performance.now()};burst(B,x,y,['#FFC83D','#FF7A59','#FFF4C2']);burst(B,x,y,['#FFC83D','#FF7A59','#FFF4C2']);SFX.boom();B.shake=Math.max(B.shake||0,10)}for(const c of byD[d]||[]){const i=c.y*N+c.x;if(hs.has(i)){const h=hs.get(i);side.marks[i]=h[2]?4:2;side.hc[i]=Math.min(99,side.hc[i]+(h[3]||1));boom=true;burst(B,c.x,c.y)}else if(side.marks[i]===0)side.marks[i]=1}
     if(boom&&d>0){SFX.boom();B.shake=Math.max(B.shake||0,7)}await sleep(d===0?SW*3:SW)}
   await sleep(260);B.sweep=null;
   for(const s of res.sunk){if(!side.sunkList.some(q=>q.t===s.t))side.sunkList.push(s);side.sunk[s.t]=true;for(const [a,b] of cellsOf(s,s.t))if(inB(a,b))burst(B,a,b,['#8FB2BC','#F4F1E8','#FF5C7A'])}
@@ -653,7 +664,7 @@ async function shotAnim(g,B,side,x,y,res,atk){B.charge=null;B.sweep={x,y,t0:perf
   else{if(res.sunk.length)btMsg2('やられた…',`${names}が撃沈された`,'l');else if(n)btMsg2(`被弾 ×${n}`,`${at} をうたれた`,'l');else btMsg2('セーフ！',`${at} はハズレ`,'w')}
   updFleet();await sleep(n||res.sunk.length?1250:950)}
 function verifyReveal(g,m){const d=m&&m.d;if(!deckOk(d)||typeof m.s!=='string')return null;const nd=normDeck(d);if(hex(cyrb128(JSON.stringify(nd)+'|'+m.s))!==g.opCm)return null;
-  const sd=mkSide(nd),key=a=>a.map(h=>h[0]+','+h[1]+','+(h[2]?1:0)).sort().join(';');for(const l of g.log){const r=resolveShot(sd,l.x,l.y);if(key(r.hits)!==key(l.h)||r.sunk.map(s=>s.t).sort().join()!==l.s.slice().sort().join())return null}return nd}
+  const sd=mkSide(nd),key=a=>a.map(h=>h[0]+','+h[1]+','+(h[2]?1:0)+','+(h[3]||1)).sort().join(';');for(const l of g.log){const r=resolveShot(sd,l.x,l.y);if(key(r.hits)!==key(l.h)||r.sunk.map(s=>s.t).sort().join()!==l.s.slice().sort().join())return null}return nd}
 async function finish(g){g.over=true;g.aiming=false;g.fire=null;const bf=$('#bFire');if(bf)bf.disabled=true;g.eB.cur.on=false;g.mB.cur.on=false;
   if(g.net&&!g.opOut&&!g.giveup){netSend({ty:'rv',d:g.me.deck,s:g.salt});const m=await waitFor(o=>o.ty==='rv',6000);
     if(m&&m.ty==='rv'){const nd=verifyReveal(g,m);if(!nd){g.result='w';g.reason='cheat'}else{g.en.deck=nd;g.eB.reveal=true}}}
