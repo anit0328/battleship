@@ -141,7 +141,7 @@ h2{margin:0;font:400 22px var(--display);letter-spacing:.04em;text-wrap:balance}
 .warn{color:var(--rose);font-weight:800}
 .homebtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:none;align-self:center;width:min(100%,380px)}
 #bFight,#bPwFight{font-size:17px;padding:10px 8px;white-space:nowrap}
-#bPwFight{background:#FFA53D;color:#1D1A33;box-shadow:0 4px 0 #C2741A}#bPwFight:active{box-shadow:0 1px 0 #C2741A}
+#bPwFight{background:#FFA53D;color:#1D1A33;box-shadow:0 4px 0 #C2741A}#bPwFight:active:not(:disabled){box-shadow:0 1px 0 #C2741A}
 #vHome .chips,#vDeck .tray,#vDeck .dbtns{flex:none}
 /* deck editor */
 .dboard{width:100%;aspect-ratio:1;max-height:min(46dvh,420px);flex:none}
@@ -412,7 +412,7 @@ $('#fName').onsubmit=e=>{e.preventDefault();const v=$('#iName').value.trim().sli
 const HB={mode:'own',side:null,cur:{x:4,y:4,ax:4,ay:4,on:true,col:'gold'},parts:[],nt:0};
 function renderHome(){HB.side=mkSide(null);HB.side.deck=save.deck;HB.side.sunk=PT.map(()=>false);
   const r=save.rec;$('#rec').innerHTML=`<button class="chip net${save.opt.online!==false?'':' off'}" id="bNet">${save.opt.online!==false?'オンライン':'オフライン'}</button><span class="chip">${r.w}勝 ${r.l}敗</span><span class="chip">CPUはLvに合わせて強くなる</span>`;
-  $('#bNet').onclick=()=>{save.opt.online=save.opt.online===false;persist();SFX.tap();renderHome()}}
+  $('#bNet').onclick=()=>{save.opt.online=save.opt.online===false;persist();SFX.tap();renderHome()};$('#bPwFight').disabled=save.opt.online===false}
 $('#bScope').onclick=()=>{SFX.tap();showView('vDeck')};
 /* ---------- deck editor ---------- */
 const ED={sel:null,d:0,off:0,hover:null,B:{mode:'edit',side:null,cur:null,parts:[]},down:null};
